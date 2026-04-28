@@ -2,6 +2,7 @@
 
 import logging
 import sys
+import time
 
 from src.crawler import Crawler
 from src.indexer import Indexer
@@ -69,19 +70,24 @@ def handle_find(engine: SearchEngine, raw_args: str) -> None:
     is_phrase = (query.startswith('"') and query.endswith('"')) or \
                 (query.startswith("'") and query.endswith("'"))
 
+    start_time = time.monotonic()
+
     if is_phrase:
         phrase = query[1:-1]
         results = engine.find_phrase(phrase)
+        elapsed = time.monotonic() - start_time
         if results:
-            display_query = f'"{phrase}" (phrase search)'
             print(engine.format_results(results, phrase))
+            print(f"\n  ({len(results)} result(s) in {elapsed:.4f}s)")
         else:
             print(f'No pages contain the exact phrase: "{phrase}"')
     else:
         words = query.split()
         results = engine.find(query)
+        elapsed = time.monotonic() - start_time
         if results:
             print(engine.format_results(results, query))
+            print(f"\n  ({len(results)} result(s) in {elapsed:.4f}s)")
         else:
             # Auto-suggest when find returns no results
             for word in words:
