@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.main import handle_build, handle_find, handle_load, handle_print, main
+from src.main import handle_build, handle_find, handle_load, handle_print, handle_stats, main
 
 
 class TestHandleBuild:
@@ -99,6 +99,25 @@ class TestHandleFind:
         handle_find(search_engine, '"our thinking"')
         output = capsys.readouterr().out
         assert "Score" in output
+
+
+class TestHandleStats:
+    """Tests for the stats command handler."""
+
+    def test_stats_with_index(self, search_engine, capsys):
+        handle_stats(search_engine)
+        output = capsys.readouterr().out
+        assert "Documents:" in output
+        assert "Unique terms:" in output
+        assert "Top 10" in output
+
+    def test_stats_without_index(self, capsys):
+        from src.indexer import Indexer
+        from src.search import SearchEngine
+        engine = SearchEngine(Indexer())
+        handle_stats(engine)
+        output = capsys.readouterr().out
+        assert "No index loaded" in output
 
 
 class TestMainLoop:

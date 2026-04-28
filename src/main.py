@@ -96,6 +96,30 @@ def handle_find(engine: SearchEngine, raw_args: str) -> None:
                     print(f"  Did you mean: {', '.join(suggestions)}?")
 
 
+def handle_stats(engine: SearchEngine) -> None:
+    """Display index statistics: documents, terms, and top words."""
+    if not engine.indexer.documents:
+        print("No index loaded. Run 'build' or 'load' first.")
+        return
+
+    total_docs = engine.indexer.get_document_count()
+    total_terms = engine.indexer.get_term_count()
+
+    print(f"Index statistics:")
+    print(f"  Documents: {total_docs}")
+    print(f"  Unique terms: {total_terms}")
+    print()
+
+    # Top 10 most frequent terms (by number of documents they appear in)
+    term_df = [(term, len(postings))
+               for term, postings in engine.indexer.index.items()]
+    term_df.sort(key=lambda x: x[1], reverse=True)
+
+    print("  Top 10 terms by document frequency:")
+    for term, df in term_df[:10]:
+        print(f"    {term:20s}  appears in {df} document(s)")
+
+
 def main() -> None:
     """Main interactive loop."""
     setup_logging()
@@ -103,7 +127,7 @@ def main() -> None:
     engine = SearchEngine(indexer)
 
     print("Search Engine Tool - COMP3011 CW2")
-    print('Commands: build, load, print <word>, find <words> or find "phrase", quit')
+    print('Commands: build, load, print <word>, find <words>, stats, quit')
     print()
 
     while True:
@@ -140,13 +164,16 @@ def main() -> None:
             else:
                 handle_find(engine, " ".join(args))
 
+        elif command == "stats":
+            handle_stats(engine)
+
         elif command in ("quit", "exit", "q"):
             print("Goodbye!")
             break
 
         else:
             print(f"Unknown command: '{command}'")
-            print('Commands: build, load, print <word>, find <words> or find "phrase", quit')
+            print('Commands: build, load, print <word>, find <words>, stats, quit')
 
         print()
 
