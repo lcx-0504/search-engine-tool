@@ -88,6 +88,50 @@ class TestSuggest:
         assert len(suggestions) <= 3
 
 
+class TestPhraseSearch:
+    """Tests for phrase (adjacent terms) search."""
+
+    def test_phrase_found(self, search_engine):
+        results = search_engine.find_phrase("our thinking")
+        assert len(results) >= 1
+
+    def test_phrase_not_adjacent(self, search_engine):
+        """Terms exist in same doc but not adjacent — should not match."""
+        results = search_engine.find_phrase("world choices")
+        assert results == []
+
+    def test_phrase_single_word_fallback(self, search_engine):
+        results = search_engine.find_phrase("world")
+        assert len(results) >= 1
+
+    def test_phrase_nonexistent_term(self, search_engine):
+        results = search_engine.find_phrase("xyzzy spoon")
+        assert results == []
+
+    def test_phrase_empty(self, search_engine):
+        results = search_engine.find_phrase("")
+        assert results == []
+
+
+class TestSnippet:
+    """Tests for snippet generation."""
+
+    def test_snippet_in_results(self, search_engine):
+        results = search_engine.find("world")
+        assert any(r.snippet for r in results)
+
+    def test_snippet_contains_term(self, search_engine):
+        results = search_engine.find("world")
+        for r in results:
+            if r.snippet:
+                assert "world" in r.snippet.lower()
+
+    def test_snippet_empty_for_missing_text(self, search_engine):
+        snippet = search_engine._generate_snippet(
+            "https://nonexistent.url/", ["world"])
+        assert snippet == ""
+
+
 class TestFormatResults:
     """Tests for result formatting."""
 
