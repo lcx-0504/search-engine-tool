@@ -19,6 +19,7 @@ class DocumentMeta:
     title: str = ""
     total_words: int = 0
     crawled_at: str = ""
+    full_text: str = ""
 
 
 @dataclass

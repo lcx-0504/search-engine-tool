@@ -72,27 +72,33 @@ class TestHandleFind:
     """Tests for the find command handler."""
 
     def test_find_single_word(self, search_engine):
-        handle_find(search_engine, ["world"])
+        handle_find(search_engine, "world")
 
     def test_find_multi_word(self, search_engine):
-        handle_find(search_engine, ["world", "thinking"])
+        handle_find(search_engine, "world thinking")
 
     def test_find_no_results(self, search_engine):
-        handle_find(search_engine, ["xyzzy"])
+        handle_find(search_engine, "xyzzy")
 
     def test_find_without_index(self, capsys):
         from src.indexer import Indexer
         from src.search import SearchEngine
         engine = SearchEngine(Indexer())
-        handle_find(engine, ["world"])
+        handle_find(engine, "world")
         output = capsys.readouterr().out
         assert "No index loaded" in output
 
     def test_find_auto_suggest(self, search_engine, capsys):
         """When a term is not found, suggestions are shown automatically."""
-        handle_find(search_engine, ["wor"])
+        handle_find(search_engine, "wor")
         output = capsys.readouterr().out
         assert "Did you mean" in output
+
+    def test_find_phrase_search(self, search_engine, capsys):
+        """Quoted query triggers phrase search."""
+        handle_find(search_engine, '"our thinking"')
+        output = capsys.readouterr().out
+        assert "Score" in output
 
 
 class TestMainLoop:

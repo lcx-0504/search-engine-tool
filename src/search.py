@@ -1,4 +1,4 @@
-"""Search engine with TF-IDF ranking and query suggestions."""
+"""Search engine with TF-IDF ranking, phrase search, and query suggestions."""
 
 from typing import Dict, List, Optional, Set
 
@@ -78,14 +78,109 @@ class SearchEngine:
                 total_score += stats.tf * idf
                 matched[term] = stats
 
+            snippet = self._generate_snippet(url, terms)
             results.append(SearchResult(
                 url=url,
                 score=total_score,
                 matched_terms=matched,
+                snippet=snippet,
             ))
 
         results.sort(key=lambda r: r.score, reverse=True)
         return results
+
+    def find_phrase(self, phrase: str) -> List[SearchResult]:
+        """Find pages where query terms appear as an adjacent phrase.
+
+        Uses stored token positions to verify that terms appear
+        consecutively in the document, not just anywhere on the page.
+        """
+        terms = self.indexer.tokenize(phrase)
+        if not terms:
+            print("Empty query. Please enter at least one search term.")
+            return []
+
+        if len(terms) == 1:
+            return self.find(phrase)
+
+        # All terms must exist in the index
+        for term in terms:
+            if self.indexer.get_entry(term) is None:
+                print(f"No results found: term '{term}' does not exist in the index.")
+                return []
+
+        # Find documents containing all terms
+        doc_sets = [set(self.indexer.index[t].keys()) for t in terms]
+        candidates = doc_sets[0]
+        for s in doc_sets[1:]:
+            candidates &= s
+
+        results: List[SearchResult] = []
+        for url in candidates:
+            # Check if terms appear as consecutive positions
+            first_positions = self.indexer.index[terms[0]][url].positions
+            for start_pos in first_positions:
+                match = True
+                for offset, term in enumerate(terms[1:], 1):
+                    if (start_pos + offset) not in self.indexer.index[term][url].positions:
+                        match = False
+                        break
+                if match:
+                    # Phrase found in this document
+                    total_score = 0.0
+                    matched: Dict[str, WordStats] = {}
+                    for term in terms:
+                        stats = self.indexer.index[term][url]
+                        idf = self.indexer.idf_scores.get(term, 0.0)
+                        total_score += stats.tf * idf
+                        matched[term] = stats
+
+                    snippet = self._generate_snippet(url, terms)
+                    results.append(SearchResult(
+                        url=url,
+                        score=total_score,
+                        matched_terms=matched,
+                        snippet=snippet,
+                    ))
+                    break
+
+        results.sort(key=lambda r: r.score, reverse=True)
+        return results
+
+    def _generate_snippet(self, url: str, terms: List[str],
+                          context_chars: int = 80) -> str:
+        """Generate a text snippet around the first matched term.
+
+        Extracts a window of context_chars characters around the first
+        occurrence of any query term in the document's full text.
+        """
+        doc = self.indexer.documents.get(url)
+        if not doc or not doc.full_text:
+            return ""
+
+        text = doc.full_text
+        text_lower = text.lower()
+
+        # Find the earliest occurrence of any query term
+        best_pos = len(text)
+        for term in terms:
+            pos = text_lower.find(term)
+            if pos != -1 and pos < best_pos:
+                best_pos = pos
+
+        if best_pos == len(text):
+            return ""
+
+        start = max(0, best_pos - context_chars // 2)
+        end = min(len(text), best_pos + context_chars // 2)
+
+        snippet = text[start:end].strip()
+        if start > 0:
+            snippet = "..." + snippet
+        if end < len(text):
+            snippet = snippet + "..."
+
+        return snippet
 
     def suggest(self, prefix: str, max_results: int = 5) -> List[str]:
         """Suggest words from the index matching a prefix.
@@ -110,7 +205,7 @@ class SearchEngine:
         """Format search results for display.
 
         Shows query terms (joined with AND), result count, and for each
-        result: rank, TF-IDF score, URL, and per-term match details.
+        result: rank, TF-IDF score, URL, snippet, and per-term match details.
         """
         terms = self.indexer.tokenize(query)
         lines = [f'Searching for: {" AND ".join(terms)}']
@@ -119,6 +214,8 @@ class SearchEngine:
 
         for i, result in enumerate(results, 1):
             lines.append(f"  {i}. [Score: {result.score:.4f}] {result.url}")
+            if result.snippet:
+                lines.append(f"     {result.snippet}")
             for term, stats in result.matched_terms.items():
                 lines.append(f"     '{term}': frequency={stats.frequency}, "
                              f"positions={stats.positions}")

@@ -52,9 +52,10 @@ def handle_print(engine: SearchEngine, word: str) -> None:
     engine.print_index(word)
 
 
-def handle_find(engine: SearchEngine, words: list) -> None:
+def handle_find(engine: SearchEngine, raw_args: str) -> None:
     """Execute the find command: search for pages containing all words.
 
+    Supports phrase search with quotes: find "deep thoughts"
     When no results are found, automatically suggests similar terms
     based on prefix matching to help the user refine their query.
     """
@@ -62,16 +63,31 @@ def handle_find(engine: SearchEngine, words: list) -> None:
         print("No index loaded. Run 'build' or 'load' first.")
         return
 
-    query = " ".join(words)
-    results = engine.find(query)
-    if results:
-        print(engine.format_results(results, query))
+    query = raw_args.strip()
+
+    # Detect phrase search: query wrapped in quotes
+    is_phrase = (query.startswith('"') and query.endswith('"')) or \
+                (query.startswith("'") and query.endswith("'"))
+
+    if is_phrase:
+        phrase = query[1:-1]
+        results = engine.find_phrase(phrase)
+        if results:
+            display_query = f'"{phrase}" (phrase search)'
+            print(engine.format_results(results, phrase))
+        else:
+            print(f'No pages contain the exact phrase: "{phrase}"')
     else:
-        # Auto-suggest when find returns no results
-        for word in words:
-            suggestions = engine.suggest(word.lower())
-            if suggestions:
-                print(f"  Did you mean: {', '.join(suggestions)}?")
+        words = query.split()
+        results = engine.find(query)
+        if results:
+            print(engine.format_results(results, query))
+        else:
+            # Auto-suggest when find returns no results
+            for word in words:
+                suggestions = engine.suggest(word.lower())
+                if suggestions:
+                    print(f"  Did you mean: {', '.join(suggestions)}?")
 
 
 def main() -> None:
@@ -81,7 +97,7 @@ def main() -> None:
     engine = SearchEngine(indexer)
 
     print("Search Engine Tool - COMP3011 CW2")
-    print("Commands: build, load, print <word>, find <word1> [word2 ...], quit")
+    print('Commands: build, load, print <word>, find <words> or find "phrase", quit')
     print()
 
     while True:
@@ -114,9 +130,9 @@ def main() -> None:
 
         elif command == "find":
             if not args:
-                print("Usage: find <word1> [word2 ...]")
+                print("Usage: find <word1> [word2 ...] or find \"phrase\"")
             else:
-                handle_find(engine, args)
+                handle_find(engine, " ".join(args))
 
         elif command in ("quit", "exit", "q"):
             print("Goodbye!")
@@ -124,7 +140,7 @@ def main() -> None:
 
         else:
             print(f"Unknown command: '{command}'")
-            print("Commands: build, load, print <word>, find <word1> [word2 ...], quit")
+            print('Commands: build, load, print <word>, find <words> or find "phrase", quit')
 
         print()
 
