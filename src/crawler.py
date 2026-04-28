@@ -18,16 +18,23 @@ class Crawler:
 
     def __init__(self, base_url: str = BASE_URL, delay: float = 6.0) -> None:
         self.base_url = base_url
-        self.delay = delay
+        self.delay = delay  # Minimum seconds between requests (politeness window)
         self.session = requests.Session()
         self.session.headers.update({
             "User-Agent": "COMP3011-SearchEngine/1.0"
         })
+        # Track last request time for elapsed-time politeness enforcement
         self._last_request_time: float = 0.0
+        # Collect failed URLs for a retry pass at the end of crawling
         self.failed_urls: List[str] = []
 
     def _wait(self) -> None:
-        """Enforce minimum delay between consecutive requests."""
+        """Enforce minimum delay between consecutive requests.
+
+        Uses elapsed-time difference rather than a fixed timer, so the
+        wait is shortened by any processing time between requests.
+        Skips the wait entirely on the very first request.
+        """
         elapsed = time.monotonic() - self._last_request_time
         if self._last_request_time > 0 and elapsed < self.delay:
             wait_time = self.delay - elapsed
@@ -35,10 +42,14 @@ class Crawler:
             time.sleep(wait_time)
 
     def fetch_page(self, url: str, retries: int = 3) -> Optional[BeautifulSoup]:
-        """Fetch and parse a single page with retry logic."""
+        """Fetch and parse a single page with retry logic.
+
+        Retries up to `retries` times with exponential backoff (2^attempt seconds)
+        on any request failure. Returns None if all attempts fail.
+        """
         for attempt in range(1, retries + 1):
             try:
-                self._wait()
+                self._wait()  # Respect politeness window before each request
                 self._last_request_time = time.monotonic()
                 response = self.session.get(url, timeout=10)
                 response.raise_for_status()
@@ -46,12 +57,16 @@ class Crawler:
             except requests.RequestException as e:
                 logger.warning(f"Attempt {attempt}/{retries} failed for {url}: {e}")
                 if attempt < retries:
-                    time.sleep(2 ** attempt)
+                    time.sleep(2 ** attempt)  # Exponential backoff: 2s, 4s, ...
         logger.error(f"Failed to fetch {url} after {retries} attempts")
         return None
 
     def parse_quotes_page(self, soup: BeautifulSoup, url: str) -> Dict[str, Any]:
-        """Extract all quotes and metadata from a quotes page."""
+        """Extract all quotes and metadata from a quotes page.
+
+        Each quote includes text, author name, tags, and a link to the
+        author's detail page. Returns quotes list and next page URL.
+        """
         quotes: List[Dict[str, Any]] = []
         for quote_div in soup.select("div.quote"):
             text_el = quote_div.select_one("span.text")
@@ -96,7 +111,11 @@ class Crawler:
 
     def _retry_failed(self, pages: List[Dict[str, Any]],
                       authors: Dict[str, Dict[str, str]]) -> None:
-        """Retry all URLs that failed during the initial crawl."""
+        """Retry all URLs that failed during the initial crawl.
+
+        URLs that still fail after retry remain in self.failed_urls
+        so the caller can report them.
+        """
         if not self.failed_urls:
             return
 
@@ -135,7 +154,7 @@ class Crawler:
         url: Optional[str] = self.base_url
         page_num = 0
 
-        # Phase 1: crawl all quote pages
+        # Phase 1: crawl all quote pages, following pagination links
         while url:
             page_num += 1
             logger.info(f"Crawling page {page_num}: {url}")
@@ -148,6 +167,7 @@ class Crawler:
             pages.append(page_data)
             print(f"  Page {page_num}: {len(page_data['quotes'])} quotes found")
 
+            # Collect unique author URLs for Phase 2
             for quote in page_data["quotes"]:
                 author_url = quote.get("author_url")
                 if author_url and author_url not in author_urls_seen:
@@ -166,7 +186,7 @@ class Crawler:
             else:
                 self.failed_urls.append(author_url)
 
-        # Phase 3: retry failed URLs
+        # Phase 3: one retry pass for any URLs that failed above
         self._retry_failed(pages, authors)
 
         if self.failed_urls:

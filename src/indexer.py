@@ -19,18 +19,32 @@ class Indexer:
     """Builds and manages an inverted index from crawled data."""
 
     def __init__(self) -> None:
+        # Inverted index: word -> {document_url -> WordStats}
         self.index: Dict[str, Dict[str, WordStats]] = {}
+        # Document metadata: url -> DocumentMeta
         self.documents: Dict[str, DocumentMeta] = {}
+        # Pre-computed IDF scores: word -> log(N / df)
         self.idf_scores: Dict[str, float] = {}
 
     def tokenize(self, text: str) -> List[str]:
-        """Tokenize text into lowercase words, stripping punctuation."""
+        """Tokenize text into lowercase words, stripping punctuation.
+
+        Allows apostrophes within words (e.g. "don't") but removes all
+        other punctuation. Case-insensitive as required by the Brief.
+        """
         text = text.lower()
+        # Match multi-char words (with internal apostrophes) or single letters
         tokens = re.findall(r"[a-z][a-z']*[a-z]|[a-z]", text)
         return tokens
 
     def build_index(self, crawl_data: Dict[str, Any]) -> None:
-        """Build the full inverted index from crawl data."""
+        """Build the full inverted index from crawl data.
+
+        Processes quote pages and author pages separately:
+        - Quote pages: indexes quote text, author names, and tags
+        - Author pages: indexes name, birth info, and description
+        After indexing, computes TF and IDF for all term-document pairs.
+        """
         self.index.clear()
         self.documents.clear()
         self.idf_scores.clear()
@@ -38,6 +52,8 @@ class Indexer:
         pages = crawl_data.get("pages", [])
         authors = crawl_data.get("authors", {})
 
+        # Index quote pages: each page URL is one document, combining all
+        # quote text, author names, and tags on that page
         for page in pages:
             url = page["url"]
             all_text_parts: List[str] = []
@@ -59,6 +75,8 @@ class Indexer:
 
             self._index_tokens(url, tokens)
 
+        # Index author pages: each author URL is one document, combining
+        # name, birth date, birth location, and biography description
         for author_url, author_info in authors.items():
             all_parts: List[str] = []
             all_parts.append(author_info.get("name", ""))
@@ -86,7 +104,11 @@ class Indexer:
         print(f"  Indexed {total_terms} unique terms across {total_docs} documents")
 
     def _index_tokens(self, url: str, tokens: List[str]) -> None:
-        """Add token occurrences for a document to the index."""
+        """Add token occurrences for a document to the index.
+
+        Records frequency and position of each token. Positions are
+        stored to support potential future phrase/proximity queries.
+        """
         for position, token in enumerate(tokens):
             if token not in self.index:
                 self.index[token] = {}
@@ -97,7 +119,11 @@ class Indexer:
             stats.positions.append(position)
 
     def _compute_idf(self) -> None:
-        """Compute IDF scores for all terms: log(N / df)."""
+        """Compute IDF scores for all terms: log(N / df).
+
+        Words appearing in fewer documents get higher IDF, making rare
+        terms more significant in search ranking.
+        """
         n = len(self.documents)
         if n == 0:
             return
@@ -106,7 +132,11 @@ class Indexer:
             self.idf_scores[term] = math.log(n / df) if df > 0 else 0.0
 
     def _compute_all_tf(self) -> None:
-        """Compute TF for every (term, document) pair."""
+        """Compute TF for every (term, document) pair.
+
+        TF = frequency / total_words_in_document. Normalised by document
+        length so longer documents don't get unfair advantage.
+        """
         for term, postings in self.index.items():
             for url, stats in postings.items():
                 doc = self.documents.get(url)
@@ -126,7 +156,11 @@ class Indexer:
         return len(self.index)
 
     def save_index(self, filepath: str = DEFAULT_INDEX_PATH) -> None:
-        """Serialize and save the index to a JSON file."""
+        """Serialize and save the index to a JSON file.
+
+        Stores metadata, document info, inverted index, and IDF scores.
+        Creates parent directories if they don't exist.
+        """
         path = Path(filepath)
         path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -166,7 +200,11 @@ class Indexer:
         print(f"Index saved to {filepath} ({size_kb:.0f} KB)")
 
     def load_index(self, filepath: str = DEFAULT_INDEX_PATH) -> None:
-        """Load the index from a JSON file."""
+        """Load the index from a JSON file.
+
+        Reconstructs documents, index, and IDF scores from the saved
+        JSON. Raises FileNotFoundError or ValueError on bad input.
+        """
         path = Path(filepath)
         if not path.exists():
             raise FileNotFoundError(f"Index file not found: {filepath}")
