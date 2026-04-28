@@ -153,6 +153,13 @@ class TestSnippet:
             if r.snippet:
                 assert "world" in r.snippet.lower()
 
+    def test_snippet_highlights_term(self, search_engine):
+        """Matched terms should be highlighted with *UPPERCASE*."""
+        results = search_engine.find("world")
+        for r in results:
+            if r.snippet:
+                assert "*WORLD*" in r.snippet
+
     def test_snippet_empty_for_missing_text(self, search_engine):
         snippet = search_engine._generate_snippet(
             "https://nonexistent.url/", ["world"])

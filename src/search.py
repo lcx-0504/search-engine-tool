@@ -1,5 +1,6 @@
 """Search engine with TF-IDF ranking, phrase search, and query suggestions."""
 
+import re
 from typing import Dict, List, Optional, Set
 
 from src.indexer import Indexer
@@ -195,10 +196,11 @@ class SearchEngine:
 
     def _generate_snippet(self, url: str, terms: List[str],
                           context_chars: int = 80) -> str:
-        """Generate a text snippet around the first matched term.
+        """Generate a text snippet with highlighted matched terms.
 
         Extracts a window of context_chars characters around the first
-        occurrence of any query term in the document's full text.
+        occurrence of any query term, then highlights all matched terms
+        with *UPPERCASE* markers.
         """
         doc = self.indexer.documents.get(url)
         if not doc or not doc.full_text:
@@ -221,6 +223,12 @@ class SearchEngine:
         end = min(len(text), best_pos + context_chars // 2)
 
         snippet = text[start:end].strip()
+
+        # Highlight matched terms with *UPPERCASE*
+        for term in terms:
+            pattern = re.compile(re.escape(term), re.IGNORECASE)
+            snippet = pattern.sub(lambda m: f"*{m.group().upper()}*", snippet)
+
         if start > 0:
             snippet = "..." + snippet
         if end < len(text):
