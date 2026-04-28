@@ -71,6 +71,7 @@ class Indexer:
                 title=full_text[:80] + "..." if len(full_text) > 80 else full_text,
                 total_words=len(tokens),
                 crawled_at=datetime.now(timezone.utc).isoformat(),
+                full_text=full_text,
             )
 
             self._index_tokens(url, tokens)
@@ -92,6 +93,7 @@ class Indexer:
                     title=author_info.get("name", ""),
                     total_words=len(tokens),
                     crawled_at=datetime.now(timezone.utc).isoformat(),
+                    full_text=full_text,
                 )
                 self._index_tokens(author_url, tokens)
 
@@ -176,6 +178,7 @@ class Indexer:
                     "title": doc.title,
                     "total_words": doc.total_words,
                     "crawled_at": doc.crawled_at,
+                    "full_text": doc.full_text,
                 }
                 for url, doc in self.documents.items()
             },
@@ -225,6 +228,7 @@ class Indexer:
                 title=doc_data["title"],
                 total_words=doc_data["total_words"],
                 crawled_at=doc_data["crawled_at"],
+                full_text=doc_data.get("full_text", ""),
             )
 
         for term, postings in data.get("index", {}).items():
