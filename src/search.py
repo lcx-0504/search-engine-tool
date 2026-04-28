@@ -1,5 +1,6 @@
 """Search engine with TF-IDF ranking, phrase search, and query suggestions."""
 
+import re
 from typing import Dict, List, Optional, Set
 
 from src.indexer import Indexer
@@ -89,6 +90,52 @@ class SearchEngine:
         results.sort(key=lambda r: r.score, reverse=True)
         return results
 
+    def find_or(self, query: str) -> List[SearchResult]:
+        """Find pages containing ANY query term (OR logic).
+
+        Unlike find(), returns documents matching at least one term.
+        Documents matching more terms and with higher TF-IDF rank higher.
+        """
+        terms = self.indexer.tokenize(query)
+        if not terms:
+            print("Empty query. Please enter at least one search term.")
+            return []
+
+        # Collect all documents matching any term
+        doc_scores: Dict[str, Dict[str, WordStats]] = {}
+        valid_terms = []
+        for term in terms:
+            entry = self.indexer.get_entry(term)
+            if entry is None:
+                continue
+            valid_terms.append(term)
+            for url, stats in entry.items():
+                if url not in doc_scores:
+                    doc_scores[url] = {}
+                doc_scores[url][term] = stats
+
+        if not doc_scores:
+            print(f"No results found for any of: {', '.join(terms)}")
+            return []
+
+        results: List[SearchResult] = []
+        for url, matched in doc_scores.items():
+            total_score = 0.0
+            for term, stats in matched.items():
+                idf = self.indexer.idf_scores.get(term, 0.0)
+                total_score += stats.tf * idf
+
+            snippet = self._generate_snippet(url, valid_terms)
+            results.append(SearchResult(
+                url=url,
+                score=total_score,
+                matched_terms=matched,
+                snippet=snippet,
+            ))
+
+        results.sort(key=lambda r: r.score, reverse=True)
+        return results
+
     def find_phrase(self, phrase: str) -> List[SearchResult]:
         """Find pages where query terms appear as an adjacent phrase.
 
@@ -149,10 +196,11 @@ class SearchEngine:
 
     def _generate_snippet(self, url: str, terms: List[str],
                           context_chars: int = 80) -> str:
-        """Generate a text snippet around the first matched term.
+        """Generate a text snippet with highlighted matched terms.
 
         Extracts a window of context_chars characters around the first
-        occurrence of any query term in the document's full text.
+        occurrence of any query term, then highlights all matched terms
+        with *UPPERCASE* markers.
         """
         doc = self.indexer.documents.get(url)
         if not doc or not doc.full_text:
@@ -175,6 +223,12 @@ class SearchEngine:
         end = min(len(text), best_pos + context_chars // 2)
 
         snippet = text[start:end].strip()
+
+        # Highlight matched terms with *UPPERCASE*
+        for term in terms:
+            pattern = re.compile(re.escape(term), re.IGNORECASE)
+            snippet = pattern.sub(lambda m: f"*{m.group().upper()}*", snippet)
+
         if start > 0:
             snippet = "..." + snippet
         if end < len(text):
