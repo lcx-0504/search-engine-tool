@@ -66,9 +66,10 @@ def handle_find(engine: SearchEngine, raw_args: str) -> None:
 
     query = raw_args.strip()
 
-    # Detect phrase search: query wrapped in quotes
+    # Detect search mode: quotes = phrase, | = OR, default = AND
     is_phrase = (query.startswith('"') and query.endswith('"')) or \
                 (query.startswith("'") and query.endswith("'"))
+    is_or = "|" in query
 
     start_time = time.monotonic()
 
@@ -81,6 +82,23 @@ def handle_find(engine: SearchEngine, raw_args: str) -> None:
             print(f"\n  ({len(results)} result(s) in {elapsed:.4f}s)")
         else:
             print(f'No pages contain the exact phrase: "{phrase}"')
+    elif is_or:
+        or_query = query.replace("|", " ")
+        results = engine.find_or(or_query)
+        elapsed = time.monotonic() - start_time
+        if results:
+            terms = engine.indexer.tokenize(or_query)
+            lines = [f'Searching for: {" OR ".join(terms)}']
+            lines.append(f"Found {len(results)} result(s):")
+            lines.append("")
+            for i, r in enumerate(results, 1):
+                lines.append(f"  {i}. [Score: {r.score:.4f}] {r.url}")
+                if r.snippet:
+                    lines.append(f"     {r.snippet}")
+            print("\n".join(lines))
+            print(f"\n  ({len(results)} result(s) in {elapsed:.4f}s)")
+        else:
+            print("No results found.")
     else:
         words = query.split()
         results = engine.find(query)

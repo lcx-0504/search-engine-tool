@@ -89,6 +89,52 @@ class SearchEngine:
         results.sort(key=lambda r: r.score, reverse=True)
         return results
 
+    def find_or(self, query: str) -> List[SearchResult]:
+        """Find pages containing ANY query term (OR logic).
+
+        Unlike find(), returns documents matching at least one term.
+        Documents matching more terms and with higher TF-IDF rank higher.
+        """
+        terms = self.indexer.tokenize(query)
+        if not terms:
+            print("Empty query. Please enter at least one search term.")
+            return []
+
+        # Collect all documents matching any term
+        doc_scores: Dict[str, Dict[str, WordStats]] = {}
+        valid_terms = []
+        for term in terms:
+            entry = self.indexer.get_entry(term)
+            if entry is None:
+                continue
+            valid_terms.append(term)
+            for url, stats in entry.items():
+                if url not in doc_scores:
+                    doc_scores[url] = {}
+                doc_scores[url][term] = stats
+
+        if not doc_scores:
+            print(f"No results found for any of: {', '.join(terms)}")
+            return []
+
+        results: List[SearchResult] = []
+        for url, matched in doc_scores.items():
+            total_score = 0.0
+            for term, stats in matched.items():
+                idf = self.indexer.idf_scores.get(term, 0.0)
+                total_score += stats.tf * idf
+
+            snippet = self._generate_snippet(url, valid_terms)
+            results.append(SearchResult(
+                url=url,
+                score=total_score,
+                matched_terms=matched,
+                snippet=snippet,
+            ))
+
+        results.sort(key=lambda r: r.score, reverse=True)
+        return results
+
     def find_phrase(self, phrase: str) -> List[SearchResult]:
         """Find pages where query terms appear as an adjacent phrase.
 

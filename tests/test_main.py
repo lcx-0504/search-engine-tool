@@ -100,6 +100,12 @@ class TestHandleFind:
         output = capsys.readouterr().out
         assert "Score" in output
 
+    def test_find_or_search(self, search_engine, capsys):
+        """Pipe operator triggers OR search."""
+        handle_find(search_engine, "world | change")
+        output = capsys.readouterr().out
+        assert "OR" in output
+
 
 class TestHandleStats:
     """Tests for the stats command handler."""

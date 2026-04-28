@@ -68,6 +68,33 @@ class TestFind:
             assert r.score >= 0.0
 
 
+class TestFindOr:
+    """Tests for OR search logic."""
+
+    def test_or_single_word(self, search_engine):
+        results = search_engine.find_or("world")
+        assert len(results) >= 1
+
+    def test_or_returns_more_than_and(self, search_engine):
+        """OR should return at least as many results as AND."""
+        and_results = search_engine.find("world change")
+        or_results = search_engine.find_or("world change")
+        assert len(or_results) >= len(and_results)
+
+    def test_or_no_results(self, search_engine):
+        results = search_engine.find_or("xyzzyspoon")
+        assert results == []
+
+    def test_or_empty_query(self, search_engine):
+        results = search_engine.find_or("")
+        assert results == []
+
+    def test_or_partial_terms_exist(self, search_engine):
+        """OR still returns results even if only some terms exist."""
+        results = search_engine.find_or("world xyzzyspoon")
+        assert len(results) >= 1
+
+
 class TestSuggest:
     """Tests for query suggestions."""
 
