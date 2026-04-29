@@ -1,5 +1,8 @@
 """CLI entry point for the search engine tool."""
 
+import warnings
+warnings.filterwarnings("ignore", message="urllib3 v2 only supports OpenSSL")
+
 import logging
 import sys
 import time

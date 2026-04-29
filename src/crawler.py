@@ -38,7 +38,7 @@ class Crawler:
         elapsed = time.monotonic() - self._last_request_time
         if self._last_request_time > 0 and elapsed < self.delay:
             wait_time = self.delay - elapsed
-            logger.info(f"Waiting {wait_time:.1f}s (politeness window)")
+            logger.info(f"Politeness: {elapsed:.1f}s elapsed + {wait_time:.1f}s wait = {self.delay:.1f}s total")
             time.sleep(wait_time)
 
     def fetch_page(self, url: str, retries: int = 3) -> Optional[BeautifulSoup]:
