@@ -124,6 +124,22 @@ search-engine-tool/
   README.md
 ```
 
+## Video Demonstration
+
+- [OneDrive (University of Leeds)](https://leeds365-my.sharepoint.com/:v:/g/personal/sc222cl_leeds_ac_uk/IQDsKEvdeFAaQZ3FGF5qiOjTAf5dN4J5vJDJi40bEvG9aMk?e=bgOlNl)
+- [Google Drive](https://drive.google.com/file/d/1e3pa76bP0USaUeH0HPfbgboDvOvJVIZH/view?usp=sharing)
+- [Bilibili](https://www.bilibili.com/video/BV1tt9sBUE5A/)
+
+## GenAI Declaration
+
+This project was developed with the assistance of **Claude** (Anthropic). The AI was used as a design partner throughout the development process — discussing architectural approaches, data structure trade-offs, and implementation strategies before writing code.
+
+**Where GenAI helped:** It accelerated the design loop, allowing rapid evaluation of different approaches (e.g., whether to store token positions for phrase search support).
+
+**Where GenAI fell short:** The AI-generated code was not always correct. For example, the initial crawler implementation used a fixed `time.sleep()` instead of tracking elapsed time for the politeness window. The AI's test suite also missed edge cases such as verifying that phrase search rejects non-adjacent terms. These issues were identified and corrected through manual review.
+
+**Key takeaway:** GenAI was most valuable as a thinking partner rather than a code generator. Every line of output required review and understanding, and the moments of correcting AI mistakes provided the deepest learning.
+
 ## Dependencies
 
 - `requests` - HTTP library for web crawling
